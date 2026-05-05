@@ -23,6 +23,10 @@
   "side_panel": {
     "default_path": "side_panel/index.html"
   },
+  "options_ui": {
+    "page": "options/index.html",
+    "open_in_tab": true
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

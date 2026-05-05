@@ -171,6 +171,7 @@ async function buildAll() {
   mkdirp(path.join(DIST, 'background'));
   mkdirp(path.join(DIST, 'content_scripts'));
   mkdirp(path.join(DIST, 'side_panel'));
+  mkdirp(path.join(DIST, 'options'));
   mkdirp(path.join(DIST, 'workers'));
   mkdirp(path.join(DIST, 'icons'));
 
@@ -203,6 +204,13 @@ async function buildAll() {
       },
     }),
 
+    esbuild.build({
+      ...commonOptions,
+      entryPoints: [path.join(SRC, 'options/options.js')],
+      outfile: path.join(DIST, 'options/options.js'),
+      format: 'iife',
+    }),
+
     // Web worker – bundles imagetracerjs.
     esbuild.build({
       ...commonOptions,
@@ -225,6 +233,7 @@ async function buildAll() {
   // ── Copy static files ──────────────────────────────────────────────────
   copyFile(path.join(SRC, 'manifest.json'),           path.join(DIST, 'manifest.json'));
   copyFile(path.join(SRC, 'side_panel/index.html'),   path.join(DIST, 'side_panel/index.html'));
+  copyFile(path.join(SRC, 'options/index.html'),      path.join(DIST, 'options/index.html'));
 
   // ── Generate icons ─────────────────────────────────────────────────────
   for (const size of [16, 48, 128]) {

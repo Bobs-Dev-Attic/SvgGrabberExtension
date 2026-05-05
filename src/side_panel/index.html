@@ -126,6 +126,30 @@
       display: none;
       border-radius: 4px;
     }
+    #preview-canvas {
+      max-width: 100%;
+      max-height: 180px;
+      display: none;
+      border-radius: 4px;
+      cursor: default;
+    }
+    #preview-canvas.wand-armed {
+      cursor: crosshair;
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.55);
+    }
+    #preview-marker {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      margin-left: -9px;
+      margin-top: -9px;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.9);
+      background: rgba(99, 102, 241, 0.15);
+      pointer-events: none;
+      display: none;
+    }
     #preview-empty {
       display: flex;
       flex-direction: column;
@@ -147,6 +171,57 @@
       display: flex;
       justify-content: space-between;
       font-size: 11.5px;
+    }
+    .label-with-help {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+    }
+    .help-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1px solid var(--clr-border);
+      background: var(--clr-input);
+      color: var(--clr-primary-h);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: help;
+      user-select: none;
+      position: relative;
+    }
+    .help-dot::after {
+      content: attr(data-tip);
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 8px);
+      transform: translateX(-50%);
+      min-width: 180px;
+      max-width: 220px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(12, 12, 18, 0.97);
+      border: 1px solid var(--clr-border);
+      color: var(--clr-text);
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.4;
+      text-align: left;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .14s ease;
+      z-index: 20;
+      white-space: normal;
+    }
+    .help-dot:hover::after,
+    .help-dot:focus-visible::after {
+      opacity: 1;
     }
     .slider-label span:last-child {
       color: var(--clr-primary-h);
@@ -274,6 +349,28 @@
       grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
+    .action-row-compact {
+      grid-template-columns: 1fr auto;
+      align-items: center;
+    }
+    .export-dims-row {
+      grid-template-columns: repeat(2, minmax(0, 116px));
+      justify-content: start;
+      gap: 10px;
+    }
+    input[type="number"] {
+      width: 100%;
+      max-width: 116px;
+      padding: 6px 8px;
+      border: 1px solid var(--clr-border);
+      border-radius: 8px;
+      background: var(--clr-input);
+      color: var(--clr-text);
+      font: inherit;
+    }
+    input[type="number"]::placeholder {
+      color: var(--clr-muted);
+    }
 
     /* ── Hint text ──────────────────────────────────────────────────────── */
     .hint-text {
@@ -281,6 +378,10 @@
       color: var(--clr-muted);
       text-align: center;
       padding: 4px 0;
+    }
+    .hint-text.left {
+      text-align: left;
+      padding: 0;
     }
 
     /* ── Status badge ───────────────────────────────────────────────────── */
@@ -327,7 +428,9 @@
         </svg>
         No capture yet
       </div>
-      <img id="preview-img" alt="Captured area preview" />
+      <canvas id="preview-canvas" aria-label="Captured area preview"></canvas>
+      <img id="preview-img" alt="Captured area preview" hidden />
+      <div id="preview-marker" aria-hidden="true"></div>
     </div>
 
     <button class="btn btn-primary btn-full" id="btn-new-capture">
@@ -339,6 +442,22 @@
       </svg>
       New Capture
     </button>
+
+    <div class="action-row action-row-compact">
+      <button class="btn btn-ghost" id="btn-pick-bg" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6 18l6-6"/><path d="M14 4l6 6"/><path d="M12 6l6 6"/>
+          <path d="M5 19l-1 1"/><path d="M3 21l2-2"/>
+        </svg>
+        Pick Background
+      </button>
+      <button class="btn btn-ghost" id="btn-clear-bg-pick" disabled>Clear</button>
+    </div>
+
+    <p class="hint-text left" id="bg-pick-hint">
+      Use the wand to click the preview and sample the background you want removed.
+    </p>
   </section>
 
   <!-- Trace settings section -->
@@ -347,7 +466,10 @@
 
     <div class="slider-row">
       <div class="slider-label">
-        <label for="sl-colors">Color Quantization</label>
+        <div class="label-with-help">
+          <label for="sl-colors">Color Quantization</label>
+          <span class="help-dot" tabindex="0" data-tip="Controls how many flat colors the trace uses. Lower values simplify the artwork more aggressively, while higher values preserve subtle color changes.">i</span>
+        </div>
         <span id="sl-colors-val">8</span>
       </div>
       <input type="range" id="sl-colors" min="2" max="16" step="1" value="8"
@@ -356,7 +478,10 @@
 
     <div class="slider-row">
       <div class="slider-label">
-        <label for="sl-smooth">Smoothing</label>
+        <div class="label-with-help">
+          <label for="sl-smooth">Smoothing</label>
+          <span class="help-dot" tabindex="0" data-tip="Softens noisy edges before tracing. Raise this when the capture has rough pixels or anti-aliased edges that create lots of tiny shapes.">i</span>
+        </div>
         <span id="sl-smooth-val">0</span>
       </div>
       <input type="range" id="sl-smooth" min="0" max="100" step="5" value="0"
@@ -365,7 +490,10 @@
 
     <div class="slider-row">
       <div class="slider-label">
-        <label for="sl-simplify">Simplification (RDP)</label>
+        <div class="label-with-help">
+          <label for="sl-simplify">Simplification (RDP)</label>
+          <span class="help-dot" tabindex="0" data-tip="Reduces anchor points in traced paths. Higher values create lighter SVGs with fewer nodes, but can smooth away small details.">i</span>
+        </div>
         <span id="sl-simplify-val">0</span>
       </div>
       <input type="range" id="sl-simplify" min="0" max="100" step="5" value="0"
@@ -373,11 +501,73 @@
     </div>
 
     <div class="toggle-row">
-      <label for="toggle-bg">Remove Background</label>
+      <div class="label-with-help">
+        <label for="toggle-bg">Remove Background</label>
+        <span class="help-dot" tabindex="0" data-tip="Makes the sampled or auto-detected background transparent before tracing. This is useful when you want the main subject without its surrounding page color.">i</span>
+      </div>
       <label class="switch" title="Detect and erase the dominant background colour before tracing">
         <input type="checkbox" id="toggle-bg" />
         <span class="switch-track"></span>
       </label>
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-label">
+        <div class="label-with-help">
+          <label for="sl-bg-tolerance">Background Tolerance</label>
+          <span class="help-dot" tabindex="0" data-tip="Defines how different a pixel can be from the sampled background color and still count as background. Increase it when the background has gradients or compression noise.">i</span>
+        </div>
+        <span id="sl-bg-tolerance-val">32</span>
+      </div>
+      <input type="range" id="sl-bg-tolerance" min="4" max="96" step="2" value="32"
+             title="How far colors can vary and still count as background" />
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-label">
+        <div class="label-with-help">
+          <label for="sl-bg-sample">Sample Radius</label>
+          <span class="help-dot" tabindex="0" data-tip="Averages colors around the picked background point. Larger values help when the background has texture, but they can drift into nearby foreground colors.">i</span>
+        </div>
+        <span id="sl-bg-sample-val">1</span>
+      </div>
+      <input type="range" id="sl-bg-sample" min="0" max="8" step="1" value="1"
+             title="Average a small neighborhood around the picked background point" />
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-label">
+        <div class="label-with-help">
+          <label for="sl-bg-expand">Mask Expand</label>
+          <span class="help-dot" tabindex="0" data-tip="Expands the removed background region slightly. This can clean thin halos around the subject after the flood-fill mask is created.">i</span>
+        </div>
+        <span id="sl-bg-expand-val">1</span>
+      </div>
+      <input type="range" id="sl-bg-expand" min="0" max="10" step="1" value="1"
+             title="Grow the removed background region slightly to catch edge halos" />
+    </div>
+
+    <div class="toggle-row">
+      <div class="label-with-help">
+        <label for="toggle-trim-transparent">Trim Empty Edges</label>
+        <span class="help-dot" tabindex="0" data-tip="After background removal, crops transparent margins around the remaining subject so the final SVG has less dead space.">i</span>
+      </div>
+      <label class="switch" title="Crop transparent outer space after background removal">
+        <input type="checkbox" id="toggle-trim-transparent" />
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-label">
+        <div class="label-with-help">
+          <label for="sl-path-limit">Path Coverage</label>
+          <span class="help-dot" tabindex="0" data-tip="Keeps only the largest traced paths by visual footprint. Lower values reduce clutter and file size by discarding smaller shapes after tracing.">i</span>
+        </div>
+        <span id="sl-path-limit-val">100%</span>
+      </div>
+      <input type="range" id="sl-path-limit" min="5" max="100" step="5" value="100"
+             title="Keep only a percentage of the largest traced paths" />
     </div>
 
     <button class="btn btn-primary btn-full" id="btn-trace" disabled>
@@ -420,6 +610,64 @@
       Delete Selected Path
     </button>
 
+    <button class="btn btn-ghost" id="btn-undo" disabled>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 14L4 9l5-5"/><path d="M4 9h9a7 7 0 010 14h-2"/>
+      </svg>
+      Undo
+    </button>
+
+    <div class="slider-row">
+      <div class="slider-label">
+        <label for="input-fill-color">Selected Fill</label>
+        <span id="selected-fill-value">None</span>
+      </div>
+      <input type="color" id="input-fill-color" value="#6366f1" disabled
+             title="Change the fill color of the selected object" />
+    </div>
+
+    <div class="card" style="padding:10px; gap:8px;">
+      <div class="card-title">Export Settings</div>
+
+      <div class="action-row export-dims-row">
+        <div class="slider-row">
+          <div class="slider-label">
+            <label for="input-export-width">Width</label>
+          </div>
+          <input type="number" id="input-export-width" min="1" step="1" placeholder="Original" />
+        </div>
+        <div class="slider-row">
+          <div class="slider-label">
+            <label for="input-export-height">Height</label>
+          </div>
+          <input type="number" id="input-export-height" min="1" step="1" placeholder="Original" />
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <div class="label-with-help">
+          <label for="toggle-maintain-ratio">Maintain Ratio</label>
+          <span class="help-dot" tabindex="0" data-tip="When enabled, changing width updates height automatically and vice versa, using the traced SVG's current aspect ratio.">i</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-maintain-ratio" checked />
+          <span class="switch-track"></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <div class="label-with-help">
+          <label for="toggle-omit-dimensions">Omit Width / Height</label>
+          <span class="help-dot" tabindex="0" data-tip="Removes the SVG width and height attributes so the file relies on its viewBox. This can be useful when you want the SVG to scale fluidly in code.">i</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-omit-dimensions" />
+          <span class="switch-track"></span>
+        </label>
+      </div>
+    </div>
+
     <div class="action-row">
       <button class="btn btn-ghost" id="btn-download" disabled>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -439,6 +687,7 @@
       </button>
     </div>
 
+    <p class="hint-text left" id="svg-size">Estimated SVG size: --</p>
     <div id="status"></div>
   </section>
 

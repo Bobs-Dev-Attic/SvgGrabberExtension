@@ -89,6 +89,27 @@
     document.removeEventListener('keydown', onKey, true);
   }
 
+  function isRuntimeAvailable() {
+    return typeof chrome !== 'undefined' && !!chrome.runtime?.id;
+  }
+
+  function safeSendMessage(message) {
+    if (!isRuntimeAvailable()) {
+      teardown();
+      return;
+    }
+
+    try {
+      chrome.runtime.sendMessage(message, () => {
+        if (chrome.runtime.lastError) {
+          teardown();
+        }
+      });
+    } catch {
+      teardown();
+    }
+  }
+
   // ── Event handlers ────────────────────────────────────────────────────────
   overlay.addEventListener('mousedown', (e) => {
     e.preventDefault();
@@ -123,7 +144,7 @@
     }
 
     // Send coordinates + HiDPI ratio to the service worker for capture.
-    chrome.runtime.sendMessage({
+    safeSendMessage({
       type: 'CAPTURE_AREA',
       rect,
       devicePixelRatio: window.devicePixelRatio || 1,
