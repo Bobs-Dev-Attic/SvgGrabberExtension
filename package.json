@@ -1,0 +1,16 @@
+{
+  "name": "svg-grabber-extension",
+  "version": "1.0.0",
+  "description": "Capture any rectangular area of a webpage and convert it to an editable SVG — fully local, no data leaves your device.",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js --watch"
+  },
+  "dependencies": {
+    "fabric": "^5.3.0",
+    "imagetracerjs": "^1.2.6"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

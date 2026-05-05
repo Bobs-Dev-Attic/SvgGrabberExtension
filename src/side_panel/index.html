@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SVG Grabber</title>
+  <style>
+    /* ── Design tokens ──────────────────────────────────────────────────── */
+    :root {
+      --clr-bg:          #0f0f13;
+      --clr-panel:       #1a1a24;
+      --clr-input:       #242430;
+      --clr-border:      #2e2e3e;
+      --clr-primary:     #6366f1;
+      --clr-primary-h:   #818cf8;
+      --clr-danger:      #ef4444;
+      --clr-success:     #22c55e;
+      --clr-text:        #e4e4ef;
+      --clr-muted:       #7878a0;
+      --clr-track:       #35354a;
+      --clr-thumb:       #6366f1;
+      --radius:          8px;
+      --gap:             10px;
+    }
+
+    /* ── Reset ──────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--clr-bg);
+      color: var(--clr-text);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 12.5px;
+      line-height: 1.5;
+      height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--clr-panel);
+      border-bottom: 1px solid var(--clr-border);
+      flex-shrink: 0;
+    }
+    header svg { flex-shrink: 0; }
+    header h1 {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Main scroll area ───────────────────────────────────────────────── */
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 7px 14px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity .15s, background .15s;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary  { background: var(--clr-primary);  color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--clr-primary-h); }
+    .btn-ghost    { background: var(--clr-input); color: var(--clr-text); }
+    .btn-ghost:hover:not(:disabled)   { background: var(--clr-border); }
+    .btn-danger   { background: var(--clr-danger); color: #fff; }
+    .btn-danger:hover:not(:disabled)  { opacity: .85; }
+    .btn-full { width: 100%; }
+
+    /* ── Section card ───────────────────────────────────────────────────── */
+    .card {
+      background: var(--clr-panel);
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--clr-muted);
+    }
+
+    /* ── Preview area ───────────────────────────────────────────────────── */
+    #preview-wrap {
+      position: relative;
+      border-radius: 6px;
+      overflow: hidden;
+      background: repeating-conic-gradient(#1e1e2e 0% 25%, #13131e 0% 50%)
+                  0 0 / 16px 16px;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #preview-img {
+      max-width: 100%;
+      max-height: 180px;
+      display: none;
+      border-radius: 4px;
+    }
+    #preview-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 24px 12px;
+      color: var(--clr-muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    /* ── Sliders ────────────────────────────────────────────────────────── */
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+    }
+    .slider-label span:last-child {
+      color: var(--clr-primary-h);
+      font-variant-numeric: tabular-nums;
+      min-width: 20px;
+      text-align: right;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--clr-track);
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--clr-thumb);
+      border: 2px solid var(--clr-bg);
+      cursor: pointer;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--clr-thumb);
+      border: 2px solid var(--clr-bg);
+      cursor: pointer;
+    }
+
+    /* ── Toggle switch ──────────────────────────────────────────────────── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .toggle-row label { cursor: pointer; user-select: none; }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 34px; height: 18px;
+      flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch-track {
+      position: absolute;
+      inset: 0;
+      background: var(--clr-track);
+      border-radius: 9px;
+      transition: background .2s;
+      cursor: pointer;
+    }
+    .switch-track::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform .2s;
+    }
+    .switch input:checked ~ .switch-track {
+      background: var(--clr-primary);
+    }
+    .switch input:checked ~ .switch-track::after {
+      transform: translateX(16px);
+    }
+
+    /* ── Canvas wrapper ─────────────────────────────────────────────────── */
+    #canvas-wrap {
+      position: relative;
+      overflow: auto;
+      border-radius: 6px;
+      background: repeating-conic-gradient(#1e1e2e 0% 25%, #13131e 0% 50%)
+                  0 0 / 16px 16px;
+      min-height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #canvas-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 24px 12px;
+      color: var(--clr-muted);
+      font-size: 12px;
+      text-align: center;
+    }
+    #main-canvas { display: none; }
+
+    /* ── Loading overlay ────────────────────────────────────────────────── */
+    #loading-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(15,15,19,.7);
+      border-radius: 6px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      color: var(--clr-text);
+      font-size: 12px;
+      z-index: 10;
+    }
+    #loading-overlay.visible { display: flex; }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid var(--clr-border);
+      border-top-color: var(--clr-primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Action row ─────────────────────────────────────────────────────── */
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    /* ── Hint text ──────────────────────────────────────────────────────── */
+    .hint-text {
+      font-size: 11px;
+      color: var(--clr-muted);
+      text-align: center;
+      padding: 4px 0;
+    }
+
+    /* ── Status badge ───────────────────────────────────────────────────── */
+    #status {
+      font-size: 11.5px;
+      color: var(--clr-muted);
+      text-align: center;
+      min-height: 16px;
+    }
+    #status.ok  { color: var(--clr-success); }
+    #status.err { color: var(--clr-danger);  }
+  </style>
+</head>
+
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header>
+  <!-- Simple vector-path icon -->
+  <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+    <rect x="1" y="1" width="20" height="20" rx="5" fill="#6366f1"/>
+    <path d="M5 14 Q8 6 11 11 Q14 16 17 8" stroke="#fff" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="5"  cy="14" r="1.5" fill="#fff"/>
+    <circle cx="11" cy="11" r="1.5" fill="#fff"/>
+    <circle cx="17" cy="8"  r="1.5" fill="#fff"/>
+  </svg>
+  <h1>SVG Grabber</h1>
+</header>
+
+<!-- ── Main content ───────────────────────────────────────────────────────── -->
+<main>
+
+  <!-- Capture section -->
+  <section class="card" id="capture-section">
+    <div class="card-title">1 · Capture</div>
+
+    <div id="preview-wrap">
+      <div id="preview-empty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 9h18M9 3v18"/>
+        </svg>
+        No capture yet
+      </div>
+      <img id="preview-img" alt="Captured area preview" />
+    </div>
+
+    <button class="btn btn-primary btn-full" id="btn-new-capture">
+      <!-- crosshair icon -->
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="22"/>
+        <line x1="2" y1="12" x2="22" y2="12"/>
+      </svg>
+      New Capture
+    </button>
+  </section>
+
+  <!-- Trace settings section -->
+  <section class="card" id="settings-section">
+    <div class="card-title">2 · Trace Settings</div>
+
+    <div class="slider-row">
+      <div class="slider-label">
+        <label for="sl-colors">Color Quantization</label>
+        <span id="sl-colors-val">8</span>
+      </div>
+      <input type="range" id="sl-colors" min="2" max="16" step="1" value="8"
+             title="Number of colors (2–16)" />
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-label">
+        <label for="sl-smooth">Smoothing</label>
+        <span id="sl-smooth-val">0</span>
+      </div>
+      <input type="range" id="sl-smooth" min="0" max="100" step="5" value="0"
+             title="Blur radius and line-filter intensity" />
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-label">
+        <label for="sl-simplify">Simplification (RDP)</label>
+        <span id="sl-simplify-val">0</span>
+      </div>
+      <input type="range" id="sl-simplify" min="0" max="100" step="5" value="0"
+             title="Ramer-Douglas-Peucker path node reduction" />
+    </div>
+
+    <div class="toggle-row">
+      <label for="toggle-bg">Remove Background</label>
+      <label class="switch" title="Detect and erase the dominant background colour before tracing">
+        <input type="checkbox" id="toggle-bg" />
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <button class="btn btn-primary btn-full" id="btn-trace" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      Trace to SVG
+    </button>
+  </section>
+
+  <!-- Result section -->
+  <section class="card" id="result-section">
+    <div class="card-title">3 · Edit &amp; Export</div>
+
+    <div id="canvas-wrap">
+      <div id="canvas-empty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        Trace result will appear here
+      </div>
+      <canvas id="main-canvas"></canvas>
+      <div id="loading-overlay" role="status" aria-live="polite">
+        <div class="spinner"></div>
+        Tracing…
+      </div>
+    </div>
+
+    <p class="hint-text">Click a path to select it · <kbd>Delete</kbd> or <kbd>Backspace</kbd> to remove</p>
+
+    <button class="btn btn-danger" id="btn-delete-sel" disabled>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+      </svg>
+      Delete Selected Path
+    </button>
+
+    <div class="action-row">
+      <button class="btn btn-ghost" id="btn-download" disabled>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download SVG
+      </button>
+      <button class="btn btn-ghost" id="btn-copy" disabled>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+        Copy SVG
+      </button>
+    </div>
+
+    <div id="status"></div>
+  </section>
+
+  <!-- Footer disclaimer -->
+  <p class="hint-text" style="padding-bottom:8px;">
+    ⚠️ Respect copyright — only vectorise content you have the right to use.
+    All processing is <strong>100% local</strong> — no data leaves your device.
+  </p>
+
+</main>
+
+<script src="panel.js"></script>
+</body>
+</html>
