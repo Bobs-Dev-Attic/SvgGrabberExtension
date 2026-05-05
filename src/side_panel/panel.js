@@ -13,7 +13,7 @@
  * responsive during tracing.
  */
 
-import { fabric } from 'fabric';
+import { Canvas, loadSVGFromString } from 'fabric';
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const btnNewCapture  = document.getElementById('btn-new-capture');
@@ -50,7 +50,7 @@ function initFabric() {
     fabricCanvas.dispose();
     fabricCanvas = null;
   }
-  fabricCanvas = new fabric.Canvas('main-canvas', {
+  fabricCanvas = new Canvas('main-canvas', {
     selection:         true,
     preserveObjectStacking: true,
     backgroundColor:   'transparent',
@@ -81,14 +81,11 @@ function onKeyDown(e) {
 
 function deleteSelected() {
   if (!fabricCanvas) return;
-  const obj = fabricCanvas.getActiveObject();
-  if (!obj) return;
+  // getActiveObjects() works for both single and multi-selection in Fabric v7.
+  const toRemove = fabricCanvas.getActiveObjects();
+  if (!toRemove.length) return;
   fabricCanvas.discardActiveObject();
-  if (obj.type === 'activeSelection') {
-    obj.forEachObject((o) => fabricCanvas.remove(o));
-  } else {
-    fabricCanvas.remove(obj);
-  }
+  toRemove.forEach((o) => fabricCanvas.remove(o));
   fabricCanvas.requestRenderAll();
   updateDeleteBtn();
 }
@@ -257,7 +254,7 @@ function startTrace() {
 
 // ── SVG → Fabric canvas ───────────────────────────────────────────────────────
 
-function onTraceSuccess(svgString) {
+async function onTraceSuccess(svgString) {
   currentSVGString = svgString;
 
   // Parse the SVG to get its declared width/height.
@@ -268,49 +265,47 @@ function onTraceSuccess(svgString) {
   const svgH   = parseFloat(svgEl?.getAttribute('height') ?? capturedImageData.height);
 
   // Size the Fabric canvas to fit inside the panel (max 320 px wide).
-  const panelW  = (document.getElementById('canvas-wrap').clientWidth || 320) - 4;
-  const scale   = Math.min(1, panelW / svgW);
-  const dispW   = Math.round(svgW * scale);
-  const dispH   = Math.round(svgH * scale);
+  const panelW = (document.getElementById('canvas-wrap').clientWidth || 320) - 4;
+  const scale  = Math.min(1, panelW / svgW);
+  const dispW  = Math.round(svgW * scale);
+  const dispH  = Math.round(svgH * scale);
 
-  canvasEl.style.display = 'block';
-  canvasEmpty.style.display = 'none';
+  canvasEl.style.display     = 'block';
+  canvasEmpty.style.display  = 'none';
 
   initFabric();
-  fabricCanvas.setWidth(dispW);
-  fabricCanvas.setHeight(dispH);
+  fabricCanvas.setDimensions({ width: dispW, height: dispH });
 
-  fabric.loadSVGFromString(svgString, (objects, options) => {
-    const group = fabric.util.groupSVGElements(objects, options);
-    group.scaleToWidth(dispW);
-    group.set({ selectable: false, evented: false });
+  // setZoom scales the viewport so that objects at native SVG coordinates are
+  // displayed at the panel width.  Fabric's svgViewportTransformation=true
+  // (the default) automatically uses this zoom when building the viewBox in
+  // toSVG(), so the exported SVG always has full-resolution path data.
+  fabricCanvas.setZoom(scale);
 
-    // Ungroup so individual paths are independently selectable.
-    fabricCanvas.add(group);
-    group.toActiveSelection();
+  // Fabric.js v7: loadSVGFromString is Promise-based and returns objects
+  // individually – no groupSVGElements / toActiveSelection needed.
+  const { objects } = await loadSVGFromString(svgString);
 
-    const allObjects = fabricCanvas.getObjects();
-    fabricCanvas.discardActiveObject();
-
-    allObjects.forEach((obj) => {
-      obj.set({
-        selectable:      true,
-        hasControls:     false,
-        hasBorders:      true,
-        lockMovementX:   true,
-        lockMovementY:   true,
-        hoverCursor:     'pointer',
-        borderColor:     '#6366f1',
-        borderScaleFactor: 2,
-      });
+  objects.filter(Boolean).forEach((obj) => {
+    obj.set({
+      selectable:        true,
+      hasControls:       false,
+      hasBorders:        true,
+      lockMovementX:     true,
+      lockMovementY:     true,
+      hoverCursor:       'pointer',
+      borderColor:       '#6366f1',
+      borderScaleFactor: 2,
     });
-
-    fabricCanvas.requestRenderAll();
-
-    btnDownload.disabled = false;
-    btnCopy.disabled     = false;
-    setStatus(`Traced ${allObjects.length} paths.  Click a path to select, Delete to remove.`, 'ok');
+    fabricCanvas.add(obj);
   });
+
+  fabricCanvas.requestRenderAll();
+
+  const count = fabricCanvas.getObjects().length;
+  btnDownload.disabled = false;
+  btnCopy.disabled     = false;
+  setStatus(`Traced ${count} paths.  Click a path to select, Delete to remove.`, 'ok');
 }
 
 // ── Delete selected ───────────────────────────────────────────────────────────
@@ -320,11 +315,11 @@ btnDeleteSel.addEventListener('click', deleteSelected);
 function canvasToSVGString() {
   if (!fabricCanvas) return currentSVGString;
 
-  // Use Fabric's built-in SVG serialiser.
-  const raw = fabricCanvas.toSVG();
-
-  // Prepend an XML declaration for well-formed output.
-  return raw.startsWith('<?xml') ? raw : `<?xml version="1.0" encoding="UTF-8"?>\n${raw}`;
+  // Fabric v7 default svgViewportTransformation=true automatically sets
+  // viewBox="0 0 nativeW nativeH" matching the canvas zoom, so the exported
+  // SVG carries full-resolution path data regardless of the display scale.
+  // The preamble (<?xml …>) is already included by Fabric's _setSVGPreamble.
+  return fabricCanvas.toSVG();
 }
 
 // ── Download ──────────────────────────────────────────────────────────────────
