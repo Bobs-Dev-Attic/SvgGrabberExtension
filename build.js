@@ -139,9 +139,10 @@ function generateIconPNG(size) {
   // Raw image rows: each row = [0(filter)] + [R,G,B × width]
   const raw = Buffer.allocUnsafe(size * (size * 3 + 1));
   for (let row = 0; row < size; row++) {
-    const rowOff = row * (size * 3 + 1);
+    const rowStart = row * size * 3;
+    const rowOff   = row * (size * 3 + 1);
     raw[rowOff] = 0; // filter type: None
-    const rowPixels = pixels.subarray(row * size * 3, row * size * 3 + size * 3);
+    const rowPixels = pixels.subarray(rowStart, rowStart + size * 3);
     Buffer.from(rowPixels.buffer, rowPixels.byteOffset, rowPixels.byteLength)
           .copy(raw, rowOff + 1);
   }

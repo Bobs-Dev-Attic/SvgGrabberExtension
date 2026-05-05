@@ -125,10 +125,10 @@ async function cropScreenshot({ dataUrl, rect, devicePixelRatio }) {
         0, 0, canvas.width, canvas.height,
       );
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      // Release the off-screen canvas memory.
+      // Release the off-screen canvas memory immediately after extracting pixel data.
       canvas.width  = 0;
       canvas.height = 0;
-      resolve({ imageData, previewDataUrl: canvas.toDataURL() });
+      resolve(imageData);
     };
     img.src = dataUrl;
   });
@@ -146,7 +146,7 @@ function showPreview(dataUrl) {
 async function handleScreenshot(payload) {
   setStatus('Screenshot captured. Adjust settings and click Trace.', 'ok');
 
-  const { imageData, previewDataUrl } = await cropScreenshot(payload);
+  const imageData = await cropScreenshot(payload);
 
   // Keep a re-usable reference to the cropped ImageData.
   capturedImageData = imageData;

@@ -90,8 +90,8 @@ function simplifyPathData(d, epsilon) {
     for (let i = 1; i < reduced.length; i++) {
       result.push(`L ${fmt(reduced[i][0])} ${fmt(reduced[i][1])}`);
     }
-    // Keep last point as seed for the next run.
-    polyline = polyline.length > 0 ? [polyline[polyline.length - 1].slice()] : [];
+    // Keep last point as seed for the next consecutive L-run.
+    polyline = [polyline[polyline.length - 1].slice()];
   }
 
   for (const { type: cmd, values: n } of segments) {
